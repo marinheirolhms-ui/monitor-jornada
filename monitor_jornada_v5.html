@@ -1,0 +1,2378 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="theme-color" content="#00e5a0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jornada">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Monitor de Jornada</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Epilogue:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: #e2ddd4;
+  --text: #1a1714;
+  --muted: #8a8278;
+  --ok: #1a7a4a;
+  --ok-light: #e8f5ee;
+  --warn: #c47a0a;
+  --warn-light: #fef7e6;
+  --danger: #c0392b;
+  --danger-light: #fdecea;
+  --info: #1a5fa8;
+  --info-light: #e8f0fc;
+  --pause: #6b4fa8;
+  --pause-light: #f0ebfc;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Epilogue', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--text);
+  color: #f5f3ee;
+  padding: 32px 20px;
+  display: flex; flex-direction: column; gap: 4px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.brand { font-size: 1.05rem; font-weight: 900; letter-spacing: -0.5px; margin-bottom: 32px; line-height: 1.2; }
+.brand em { display: block; font-style: normal; font-weight: 300; font-size: 0.72rem; color: #8a8278; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+.nav-group { font-size: 0.6rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: #5a5550; font-family: 'DM Mono', monospace; margin: 20px 0 6px 8px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px;
+  font-size: 0.82rem; font-weight: 500; color: #a09890;
+  cursor: pointer; border: none; background: transparent;
+  width: 100%; text-align: left; transition: all 0.15s;
+}
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #f5f3ee; }
+.nav-item.active { background: rgba(255,255,255,0.1); color: #f5f3ee; }
+.nav-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sidebar-clock { margin-top: auto; padding-top: 20px; border-top: 1px solid #2a2520; }
+.sc-time { font-family: 'DM Mono', monospace; font-size: 1.6rem; color: #f5f3ee; }
+.sc-date { font-size: 0.7rem; color: #5a5550; margin-top: 2px; }
+
+/* ── Main ── */
+.main { padding: 40px 44px; }
+.page { display: none; animation: fadeIn 0.2s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+
+.ph { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.ph-title { font-size: 2rem; font-weight: 900; letter-spacing: -1px; line-height: 1; }
+.ph-sub { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+/* ── Cards ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 14px; }
+.card-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 16px; }
+
+/* ── Grid ── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+.g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+
+/* ── Stat boxes ── */
+.sbox { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+.sbox-val { font-size: 1.5rem; font-weight: 900; font-family: 'DM Mono', monospace; letter-spacing: -1px; }
+.sbox-label { font-size: 0.68rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+.sbox.ok { border-color: #b8ddc8; background: var(--ok-light); }
+.sbox.ok .sbox-val { color: var(--ok); }
+.sbox.warn { border-color: #f5d08a; background: var(--warn-light); }
+.sbox.warn .sbox-val { color: var(--warn); }
+.sbox.danger { border-color: #f5b8b2; background: var(--danger-light); }
+.sbox.danger .sbox-val { color: var(--danger); }
+.sbox.info { border-color: #b8cef5; background: var(--info-light); }
+.sbox.info .sbox-val { color: var(--info); }
+.sbox.pause { border-color: #c8b8f5; background: var(--pause-light); }
+.sbox.pause .sbox-val { color: var(--pause); }
+
+/* ── Big clock ── */
+.bigclock-wrap { text-align: center; padding: 20px 0 10px; }
+.bigclock {
+  font-family: 'DM Mono', monospace; font-size: 5rem; font-weight: 500;
+  letter-spacing: 4px; line-height: 1; transition: color 0.4s;
+  color: var(--text);
+}
+.bigclock.ok { color: var(--ok); }
+.bigclock.warn { color: var(--warn); }
+.bigclock.danger { color: var(--danger); }
+.bigclock.pause { color: var(--pause); }
+.bigclock-sub { font-size: 0.72rem; color: var(--muted); margin-top: 8px; font-family: 'DM Mono', monospace; }
+
+/* ── Progress bar ── */
+.prog-wrap { position: relative; margin: 20px 0 8px; }
+.prog-bg { height: 12px; background: var(--surface2); border-radius: 99px; overflow: visible; position: relative; }
+.prog-fill { height: 100%; border-radius: 99px; transition: width 0.4s ease, background 0.4s ease; position: relative; z-index: 1; }
+.prog-fill.ok { background: linear-gradient(90deg, var(--ok), #2ecc71); }
+.prog-fill.warn { background: linear-gradient(90deg, var(--warn), #f39c12); }
+.prog-fill.danger { background: linear-gradient(90deg, var(--danger), #e74c3c); }
+.prog-fill.pause { background: linear-gradient(90deg, var(--pause), #9b59b6); }
+.prog-marker { position: absolute; top: -4px; width: 2px; height: 20px; border-radius: 2px; z-index: 2; }
+.prog-mlabel { position: absolute; top: 22px; font-size: 0.6rem; font-family: 'DM Mono', monospace; color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+
+/* ── Inputs ── */
+.field { margin-bottom: 14px; }
+.field-label { font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 5px; display: block; }
+.inp {
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 9px 12px;
+  color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.9rem;
+  outline: none; transition: border 0.15s; width: 100%;
+}
+.inp:focus { border-color: var(--text); }
+.inp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.textarea {
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; color: var(--text);
+  font-family: 'Epilogue', sans-serif; font-size: 0.82rem;
+  outline: none; resize: none; width: 100%; transition: border 0.15s;
+}
+.textarea:focus { border-color: var(--text); }
+
+/* ── Buttons ── */
+.btn {
+  padding: 10px 20px; border: none; border-radius: 10px;
+  font-family: 'Epilogue', sans-serif; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 7px;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--text); color: var(--bg); }
+.btn-primary:hover { background: #2a2520; }
+.btn-ok { background: var(--ok); color: white; }
+.btn-ok:hover { background: #155c38; }
+.btn-warn { background: var(--warn); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+.btn-ghost { background: var(--surface2); color: var(--text); border: 1.5px solid var(--border); }
+.btn-ghost:hover { border-color: var(--text); }
+.btn-pause { background: var(--pause); color: white; }
+.btn-info { background: var(--info); color: white; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-full { width: 100%; justify-content: center; }
+
+/* ── Status chip ── */
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 99px; font-size: 0.68rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+.chip::before { content:''; width:6px; height:6px; border-radius:50%; background: currentColor; }
+.chip.ok { background: var(--ok-light); color: var(--ok); border: 1px solid #b8ddc8; }
+.chip.warn { background: var(--warn-light); color: var(--warn); border: 1px solid #f5d08a; }
+.chip.danger { background: var(--danger-light); color: var(--danger); border: 1px solid #f5b8b2; }
+.chip.pause { background: var(--pause-light); color: var(--pause); border: 1px solid #c8b8f5; }
+.chip.idle { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+/* ── Alert banner ── */
+.alert { display: none; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; border-left: 4px solid transparent; }
+.alert.show { display: flex; gap: 12px; align-items: flex-start; }
+.alert.ok { background: var(--ok-light); border-color: var(--ok); }
+.alert.warn { background: var(--warn-light); border-color: var(--warn); }
+.alert.danger { background: var(--danger-light); border-color: var(--danger); }
+.alert.pause { background: var(--pause-light); border-color: var(--pause); }
+.alert-ico { font-size: 1.2rem; }
+.alert-body strong { font-size: 0.85rem; }
+.alert-body p { font-size: 0.77rem; color: var(--muted); margin-top: 2px; }
+
+/* ── Lunch status ── */
+.lunch-note { font-size: 0.77rem; padding: 10px 14px; border-radius: 8px; margin-top: 10px; display: none; }
+.lunch-note.show { display: block; }
+.lunch-note.ok { background: var(--ok-light); color: var(--ok); }
+.lunch-note.warn { background: var(--warn-light); color: var(--warn); }
+.lunch-note.danger { background: var(--danger-light); color: var(--danger); }
+.lunch-note.auto { background: var(--info-light); color: var(--info); }
+
+/* ── State: not confirmed yet ── */
+.confirm-wall { text-align: center; padding: 40px 20px; }
+.confirm-wall .cw-icon { font-size: 3rem; margin-bottom: 16px; }
+.confirm-wall .cw-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+.confirm-wall .cw-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 24px; }
+
+/* ── Popup ── */
+.popup-overlay {
+  position: fixed; inset: 0; background: rgba(26,23,20,0.65);
+  backdrop-filter: blur(8px); z-index: 9999;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.popup-overlay.show { display: flex; }
+.popup-box {
+  background: var(--surface); border-radius: 20px; padding: 44px 40px;
+  max-width: 520px; width: 100%; text-align: center;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.18);
+  border: 2px solid var(--border);
+  animation: popIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes popIn { from { transform: scale(0.82) translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
+.popup-box.danger { border-color: var(--danger); box-shadow: 0 24px 80px rgba(192,57,43,0.2); }
+.popup-box.warn { border-color: var(--warn); box-shadow: 0 24px 80px rgba(196,122,10,0.15); }
+.popup-box.pause { border-color: var(--pause); }
+.popup-ico { font-size: 4rem; margin-bottom: 16px; display: block; }
+.popup-title { font-size: 1.7rem; font-weight: 900; letter-spacing: -0.5px; line-height: 1.2; margin-bottom: 10px; }
+.popup-title.danger { color: var(--danger); }
+.popup-title.warn { color: var(--warn); }
+.popup-title.pause { color: var(--pause); }
+.popup-text { font-size: 0.88rem; color: var(--muted); line-height: 1.7; margin-bottom: 28px; }
+.popup-countdown { font-family: 'DM Mono', monospace; font-size: 2.6rem; font-weight: 500; color: var(--danger); margin: -8px 0 24px; }
+.popup-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* ── History table ── */
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.tbl th { padding: 8px 12px; text-align: left; font-size: 0.62rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); font-family: 'DM Mono', monospace; }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: var(--surface2); }
+
+/* ── Weekly chart ── */
+.week-chart { display: flex; align-items: flex-end; gap: 10px; height: 110px; margin: 16px 0 24px; }
+.wbar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; justify-content:flex-end; }
+.wbar { width:100%; border-radius:6px 6px 0 0; min-height:4px; }
+.wbar.ok { background: var(--ok); }
+.wbar.warn { background: var(--warn); }
+.wbar.danger { background: var(--danger); }
+.wbar.empty { background: var(--border); height: 4px !important; }
+.wbar-label { font-size: 0.62rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+.wbar-val { font-size: 0.62rem; font-weight: 600; }
+
+/* ── Risk bars ── */
+.risk-row { margin-bottom: 14px; }
+.risk-header { display:flex; justify-content:space-between; font-size:0.78rem; margin-bottom:5px; }
+.risk-bar-bg { height: 8px; background: var(--surface2); border-radius: 99px; overflow: hidden; }
+.risk-bar { height: 100%; border-radius: 99px; }
+
+/* ── Divider ── */
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+/* ── Import page ── */
+.import-drop {
+  border: 2px dashed var(--border); border-radius: 16px;
+  padding: 48px 24px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: var(--surface);
+  margin-bottom: 14px;
+}
+.import-drop:hover, .import-drop.dragover { border-color: var(--ok); background: var(--ok-light); }
+.import-drop-icon { font-size: 3rem; margin-bottom: 12px; }
+.import-drop-title { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.import-drop-sub { font-size: 0.78rem; color: var(--muted); }
+.import-progress { display: none; }
+.import-progress.show { display: block; }
+.import-log { background: var(--surface2); border-radius: 10px; padding: 14px; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); max-height: 200px; overflow-y: auto; margin-top: 10px; line-height: 1.7; }
+.import-log .log-ok { color: var(--ok); }
+.import-log .log-warn { color: var(--warn); }
+.import-log .log-danger { color: var(--danger); }
+.import-log .log-info { color: var(--info); }
+.import-preview { margin-top: 14px; }
+.preview-row {
+  display: grid; grid-template-columns: 90px 60px 120px 60px 70px 70px 1fr;
+  gap: 8px; align-items: center; padding: 8px 12px;
+  border-bottom: 1px solid var(--border); font-size: 0.78rem;
+}
+.preview-row.header { font-weight: 700; font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-family: 'DM Mono', monospace; background: var(--surface2); border-radius: 8px 8px 0 0; }
+.preview-row.ferias { background: #e8f0fc55; }
+.preview-row.abono { background: #fef7e655; }
+.preview-row.falta { background: #fdecea55; }
+.preview-row.folga { background: var(--surface2); color: var(--muted); }
+.preview-row.conflict { background: #fff3e055; border-left: 3px solid var(--warn); }
+
+/* ── Conflict modal ── */
+.conflict-overlay {
+  position: fixed; inset: 0; background: rgba(26,23,20,0.7);
+  backdrop-filter: blur(6px); z-index: 2000;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.conflict-overlay.show { display: flex; }
+.conflict-box {
+  background: var(--surface); border-radius: 20px; padding: 36px;
+  max-width: 560px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,0.15);
+  border: 2px solid var(--warn-light);
+}
+.conflict-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 6px; color: var(--warn); }
+.conflict-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 20px; }
+.conflict-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.conflict-col { background: var(--surface2); border-radius: 10px; padding: 14px; }
+.conflict-col-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; font-family: 'DM Mono', monospace; }
+.conflict-col-val { font-size: 0.82rem; font-family: 'DM Mono', monospace; line-height: 1.8; }
+.conflict-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 680px) {
+  .preview-row { grid-template-columns: 80px 1fr 1fr; }
+  .preview-row > *:nth-child(n+4) { display: none; }
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 680px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+  .g4 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: 1fr; }
+  .bigclock { font-size: 3rem; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="brand">Monitor<br>de Jornada <em>v3 · controle diário</em></div>
+
+  <div class="nav-group">Páginas</div>
+  <button class="nav-item active" id="nav-hoje" onclick="nav('hoje')">
+    <div class="dot" style="background:#2ecc71"></div> Hoje
+  </button>
+  <button class="nav-item" id="nav-historico" onclick="nav('historico')">
+    <div class="dot" style="background:#3498db"></div> Histórico
+  </button>
+  <button class="nav-item" id="nav-importar" onclick="nav('importar')">
+    <div class="dot" style="background:#e67e22"></div> Importar PDF
+  </button>
+  <button class="nav-item" id="nav-resumo" onclick="nav('resumo')">
+    <div class="dot" style="background:#f39c12"></div> Resumo Semanal
+  </button>
+
+  <div class="nav-group">Ações</div>
+  <button class="nav-item" onclick="exportExcel()">
+    <div class="dot" style="background:#9b59b6"></div> Exportar Excel
+  </button>
+  <button class="nav-item" onclick="clearAll()">
+    <div class="dot" style="background:#e74c3c"></div> Limpar dados
+  </button>
+
+  <div class="nav-group">Testes de Alerta</div>
+  <button class="nav-item" onclick="testarAlerta(30)" title="Simula alerta de 30min">
+    <div class="dot" style="background:#f39c12"></div> Testar — 30 min
+  </button>
+  <button class="nav-item" onclick="testarAlerta(20)" title="Simula alerta de 20min">
+    <div class="dot" style="background:#e67e22"></div> Testar — 20 min
+  </button>
+  <button class="nav-item" onclick="testarAlerta(10)" title="Simula alerta de 10min + som contínuo">
+    <div class="dot" style="background:#e74c3c"></div> Testar — 10 min 🔔
+  </button>
+  <button class="nav-item" onclick="testarAlerta(5)" title="Simula tela travada de 5min">
+    <div class="dot" style="background:#c0392b"></div> Testar — 5 min 🔒
+  </button>
+  <button class="nav-item" onclick="testarTodos()" title="Dispara todos em sequência">
+    <div class="dot" style="background:#8e44ad"></div> Testar todos ▶
+  </button>
+
+  <div class="sidebar-clock">
+    <div class="sc-time" id="scTime">--:--:--</div>
+    <div class="sc-date" id="scDate">--</div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+  <!-- ─── HOJE ─── -->
+  <div class="page active" id="page-hoje">
+    <div class="ph">
+      <div>
+        <div class="ph-title">Hoje</div>
+        <div class="ph-sub" id="todayLabel">—</div>
+      </div>
+      <div id="statusChip" class="chip idle">Aguardando</div>
+    </div>
+
+    <!-- alert banner -->
+    <div class="alert" id="alertBanner">
+      <span class="alert-ico" id="alertIco">ℹ️</span>
+      <div class="alert-body">
+        <strong id="alertTitle">—</strong>
+        <p id="alertDesc">—</p>
+      </div>
+    </div>
+
+    <!-- ── Antes de confirmar entrada ── -->
+    <div id="setupPanel">
+      <div class="card">
+        <div class="card-label">Configurar Jornada</div>
+        <div class="inp-row">
+          <div class="field">
+            <label class="field-label">🟢 Horário de entrada</label>
+            <input type="time" class="inp" id="inpEntrada" value="08:00">
+          </div>
+          <div class="field">
+            <label class="field-label">⏱ Duração do intervalo</label>
+            <input type="time" class="inp" id="inpIntervalo" value="01:00">
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:14px;font-size:0.78rem;color:var(--muted);margin-top:4px">
+          💡 O almoço será calculado automaticamente como <strong>entrada + 4h</strong> até <strong>entrada + 4h + intervalo</strong>.<br>
+          Se você bater ponto manual de saída/retorno do almoço, usaremos esse horário exato.
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-primary btn-full" onclick="confirmarEntrada()">✅ Confirmar entrada e iniciar jornada</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Após confirmar entrada ── -->
+    <div id="workPanel" style="display:none">
+
+      <!-- Alerta de padrão semanal -->
+      <div id="weekPatternAlert" class="alert warn" style="display:none">
+        <span class="alert-ico">📈</span>
+        <div class="alert-body">
+          <strong id="weekPatternTitle">Padrão de hora extra detectado</strong>
+          <p id="weekPatternDesc">Você teve extras em dias consecutivos esta semana.</p>
+        </div>
+      </div>
+
+      <!-- Big clock -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div class="card-label" style="margin-bottom:0">Tempo trabalhado</div>
+          <button class="btn btn-ghost" style="font-size:0.72rem;padding:5px 12px" onclick="resetJornada()">↺ Nova jornada</button>
+        </div>
+        <div class="bigclock-wrap">
+          <div class="bigclock ok" id="bigClock">00:00:00</div>
+          <div class="bigclock-sub" id="bigSub">calculando...</div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="prog-wrap">
+          <div class="prog-bg" id="progBg">
+            <div class="prog-fill ok" id="progFill" style="width:0%"></div>
+            <!-- marker: contractual end (green) -->
+            <div class="prog-marker" id="markerContratual" style="left:80%;background:#00e5a0">
+              <span class="prog-mlabel" id="markerContratualLabel" style="color:var(--ok)">17:30</span>
+            </div>
+            <!-- marker: planned exit (blue) — hidden until set -->
+            <div class="prog-marker" id="markerPlanejado" style="display:none;background:#4d9fff">
+              <span class="prog-mlabel" style="color:var(--info)">✈ saída</span>
+            </div>
+            <!-- marker 9h30 danger -->
+            <div class="prog-marker" style="left:95%;background:#c0392b">
+              <span class="prog-mlabel">9h30</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--muted);font-family:'DM Mono',monospace;margin-top:28px">
+          <span>0h</span><span>5h</span><span>10h (limite)</span>
+        </div>
+
+        <!-- Saída planejada -->
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:160px">
+              <label class="field-label" style="font-size:0.65rem">✈ Saída planejada (opcional)</label>
+              <input type="time" class="inp" id="inpSaidaPlanejada" style="margin-top:4px"
+                oninput="onSaidaPlanejadaChange()">
+            </div>
+            <div id="saidaPlanejadaInfo" style="display:none;flex:1;min-width:160px">
+              <div style="font-size:0.72rem;color:var(--muted)">Faltam até a saída planejada</div>
+              <div style="font-size:1.2rem;font-weight:800;font-family:'DM Mono',monospace;color:var(--info)" id="saidaPlanejadaCountdown">--:--</div>
+            </div>
+            <button class="btn btn-info" id="btnCriarAlarme" style="display:none;padding:8px 14px;font-size:0.78rem" onclick="criarAlarmeWindows()">
+              🔔 Criar alarme no Windows
+            </button>
+          </div>
+          <div id="saidaPlanejadaErr" style="display:none;font-size:0.75rem;color:var(--danger);margin-top:6px;font-weight:600"></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="g4">
+        <div class="sbox info">
+          <div class="sbox-val" id="statEntrada">--:--</div>
+          <div class="sbox-label">Entrada confirmada</div>
+        </div>
+        <div class="sbox info">
+          <div class="sbox-val" id="statSaidaNormal">--:--</div>
+          <div class="sbox-label">Saída normal (8h)</div>
+        </div>
+        <div class="sbox warn">
+          <div class="sbox-val" id="statLimite">--:--</div>
+          <div class="sbox-label">Limite legal (10h)</div>
+        </div>
+        <div class="sbox ok" id="statRestBox">
+          <div class="sbox-val" id="statRest">10h00</div>
+          <div class="sbox-label">Até o limite</div>
+        </div>
+      </div>
+
+      <!-- Almoço -->
+      <div class="card">
+        <div class="card-label">🍽 Almoço / Intervalo</div>
+        <div id="lunchAutoNote" class="lunch-note auto show">
+          ⏰ Intervalo automático previsto: <strong id="lunchAutoRange">—</strong> — será descontado automaticamente se você não bater ponto.
+        </div>
+        <div id="lunchManualSection" style="margin-top:14px">
+          <div class="inp-row" style="margin-bottom:10px">
+            <div class="field">
+              <label class="field-label">Saída para almoço</label>
+              <input type="time" class="inp" id="inpAlmocoSaida">
+            </div>
+            <div class="field">
+              <label class="field-label">Retorno do almoço</label>
+              <input type="time" class="inp" id="inpAlmocoRetorno" disabled>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-pause" id="btnSairAlmoco" onclick="sairAlmoco()">🍽 Bater ponto — saída almoço</button>
+            <button class="btn btn-ok" id="btnRetornarAlmoco" onclick="retornarAlmoco()" style="display:none">✅ Bater ponto — retorno almoço</button>
+          </div>
+          <div class="lunch-note" id="lunchStatus" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- Extra + observação + saída -->
+      <div class="card">
+        <div class="card-label">Registro de Saída</div>
+        <div class="inp-row">
+          <div class="field">
+            <label class="field-label">🔴 Horário de saída</label>
+            <input type="time" class="inp" id="inpSaida">
+          </div>
+          <div class="field">
+            <label class="field-label">Horas extras (resultado)</label>
+            <div class="inp" id="extraDisplay" style="color:var(--warn);font-weight:700">0h 00min</div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">📝 Observação <span id="obsRequired" style="font-weight:700;color:var(--danger);display:none">* OBRIGATÓRIO (jornada acima de 8h)</span><span id="obsOptional" style="font-weight:400;color:var(--muted)">(opcional)</span></label>
+          <textarea class="textarea" id="inpObs" rows="2" placeholder="Motivo da hora extra, reunião, entrega urgente..."></textarea>
+        </div>
+        <button class="btn btn-ok btn-full" onclick="salvarDia()">💾 Salvar registro do dia</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ─── HISTÓRICO ─── -->
+  <div class="page" id="page-historico">
+    <div class="ph">
+      <div>
+        <div class="ph-title">Histórico</div>
+        <div class="ph-sub">Todos os dias registrados no navegador</div>
+      </div>
+      <button class="btn btn-info" onclick="exportExcel()">📥 Exportar Excel</button>
+    </div>
+    <div class="card" style="overflow-x:auto">
+      <table class="tbl" id="histTable">
+        <thead><tr>
+          <th>Data</th><th>Entrada</th><th>Almoço</th><th>Saída</th>
+          <th>Trabalhado</th><th>Extra</th><th>Status</th><th>Obs.</th><th></th>
+        </tr></thead>
+        <tbody id="histBody">
+          <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px">Nenhum registro ainda.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── IMPORTAR PDF ─── -->
+  <div class="page" id="page-importar">
+    <div class="ph">
+      <div>
+        <div class="ph-title">Importar PDF</div>
+        <div class="ph-sub">Cartão de ponto do sistema — leitura automática</div>
+      </div>
+    </div>
+
+    <!-- Drop zone -->
+    <div class="import-drop card" id="importDrop"
+         onclick="document.getElementById('pdfInput').click()"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handlePdfDrop(event)">
+      <div class="import-drop-icon">📄</div>
+      <div class="import-drop-title">Arraste o PDF aqui ou clique para selecionar</div>
+      <div class="import-drop-sub">Formato: Cartão de Ponto Energisa — Abril/2026, Maio/2026, etc.</div>
+      <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="handlePdfFile(this.files[0])">
+    </div>
+
+    <!-- Progress & log -->
+    <div class="import-progress card" id="importProgress">
+      <div class="card-label">Processando</div>
+      <div class="import-log" id="importLog"></div>
+    </div>
+
+    <!-- Preview table -->
+    <div id="importPreviewWrap" style="display:none">
+      <div class="card">
+        <div class="card-label">Pré-visualização — <span id="previewCount">0</span> dias encontrados</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:12px">
+          Revise os dados antes de importar. Dias com conflito serão confirmados um a um.
+        </div>
+        <!-- Legend -->
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:0.72rem">
+          <span>🟢 Normal</span><span>🟡 Atenção/Extra</span><span>🔴 Crítico</span>
+          <span>🏖 Férias</span><span>📋 Abono</span><span>❌ Falta</span><span>💤 Folga/DSR</span>
+          <span style="color:var(--warn)">⚠️ Conflito com dado existente</span>
+        </div>
+        <div style="overflow-x:auto">
+          <div class="preview-row header">
+            <span>Data</span><span>Tipo</span><span>Entrada / Saída</span>
+            <span>Almoço</span><span>Trabalhado</span><span>Extra</span><span>Obs.</span>
+          </div>
+          <div id="previewBody"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-ok" onclick="executeImport()">✅ Importar todos os dias</button>
+        <button class="btn btn-ghost" onclick="resetImport()">↺ Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── RESUMO ─── -->
+  <div class="page" id="page-resumo">
+    <div class="ph">
+      <div>
+        <div class="ph-title">Resumo Semanal</div>
+        <div class="ph-sub">Análise de padrões e risco</div>
+      </div>
+    </div>
+    <div class="g3">
+      <div class="sbox ok"><div class="sbox-val" id="sumOk">0</div><div class="sbox-label">Dias normais (≤8h)</div></div>
+      <div class="sbox warn"><div class="sbox-val" id="sumWarn">0</div><div class="sbox-label">Atenção (8h–9h30)</div></div>
+      <div class="sbox danger"><div class="sbox-val" id="sumDanger">0</div><div class="sbox-label">Crítico (>9h30)</div></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Últimos 7 dias</div>
+      <div class="week-chart" id="weekChart"><div style="color:var(--muted);font-size:0.8rem">Sem dados.</div></div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <span style="font-size:0.72rem;color:var(--ok)">● Normal ≤8h</span>
+        <span style="font-size:0.72rem;color:var(--warn)">● Atenção 8–9h30</span>
+        <span style="font-size:0.72rem;color:var(--danger)">● Crítico >9h30</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Distribuição de risco</div>
+      <div id="riskBars"><div style="color:var(--muted);font-size:0.8rem">Sem dados suficientes.</div></div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- ═══ CONFLICT MODAL ═══ -->
+<div class="conflict-overlay" id="conflictOverlay">
+  <div class="conflict-box">
+    <div class="conflict-title">⚠️ Conflito de dados</div>
+    <div class="conflict-sub" id="conflictSub">Já existe um registro manual para este dia. O que deseja fazer?</div>
+    <div class="conflict-compare">
+      <div class="conflict-col">
+        <div class="conflict-col-title">📱 Registro manual</div>
+        <div class="conflict-col-val" id="conflictManual">—</div>
+      </div>
+      <div class="conflict-col">
+        <div class="conflict-col-title">📄 Dados do PDF</div>
+        <div class="conflict-col-val" id="conflictPdf">—</div>
+      </div>
+    </div>
+    <div class="conflict-btns">
+      <button class="btn btn-ghost" onclick="resolveConflict('keep')" style="flex:1">📱 Manter manual</button>
+      <button class="btn btn-ok" onclick="resolveConflict('pdf')" style="flex:1">📄 Usar PDF</button>
+      <button class="btn btn-ghost" onclick="resolveConflict('skip')" style="color:var(--muted);flex:1">⏭ Pular</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ POPUP OVERLAY ═══ -->
+<div class="popup-overlay" id="popupOverlay">
+  <div class="popup-box" id="popupBox">
+    <span class="popup-ico" id="popIco">⚠️</span>
+    <div class="popup-title" id="popTitle">Atenção!</div>
+    <div class="popup-text" id="popText">—</div>
+    <div class="popup-countdown" id="popCountdown" style="display:none">05:00</div>
+    <div class="popup-btns">
+      <button class="btn btn-ghost" id="popDismiss" onclick="dismissPopup()">Entendido</button>
+      <button class="btn btn-ok" id="popSave" style="display:none" onclick="confirmarSaidaDoPopup()">✅ Confirmar saída agora</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PDF.js worker config ──────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── Alert thresholds — must be at top (used by tick via restoreOnLoad) ──
+const ALERT_THRESHOLDS = [
+  { restMax: 30, restMin: 29, key: '30', type: 'warn',
+    ico: '⏰', title: 'Faltam 30 minutos para a infração!',
+    text: 'Seu expediente está se encerrando. Verifique seu ponto e considere encerrar as atividades. Bom descanso!',
+    lock: false },
+  { restMax: 20, restMin: 19, key: '20', type: 'warn',
+    ico: '🔔', title: 'Faltam 20 minutos!',
+    text: 'Você está a 20 minutos do limite legal de jornada. Favor verificar o seu ponto! Organize-se para encerrar o expediente. Bom descanso!',
+    lock: false },
+  { restMax: 10, restMin: 9, key: '10', type: 'danger',
+    ico: '⚠️', title: 'Faltam 10 minutos — alerta!',
+    text: 'Você está muito próximo do limite legal. Encerre suas atividades e registre sua saída. Bom descanso!',
+    lock: false },
+  { restMax: 5, restMin: 4, key: '5', type: 'danger',
+    ico: '🚨', title: 'Faltam apenas 5 minutos!',
+    text: 'Esta tela está bloqueada até você confirmar a saída. Registre seu ponto agora para evitar infração trabalhista.',
+    lock: true },
+];
+
+// ════════════════════════════════════════════
+//  CONSTANTS & STORAGE
+// ════════════════════════════════════════════
+const STORAGE_KEY = 'mjv3_history';
+const STATE_KEY   = 'mjv3_state';
+function loadHist() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+function saveHist(a) { localStorage.setItem(STORAGE_KEY, JSON.stringify(a)); }
+
+// ─── State persistence ───────────────────────
+function persistState() {
+  // Only save if confirmed today — don't restore yesterday's session
+  if (!state.confirmed) { localStorage.removeItem(STATE_KEY); return; }
+  const today = todayISO ? todayISO() : new Date().toISOString().split('T')[0];
+  localStorage.setItem(STATE_KEY, JSON.stringify({ ...state, savedDate: today }));
+}
+
+function loadPersistedState() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    const today = new Date().toISOString().split('T')[0];
+    // Only restore if saved today
+    if (saved.savedDate !== today) { localStorage.removeItem(STATE_KEY); return false; }
+    // Don't restore popupLocked or lunchOverdueShown across reloads
+    saved.popupLocked = false;
+    saved.lunchOverdueShown = false;
+    saved.lastAlert = null; // reset alerts so they can fire again if still in range
+    state = saved;
+    return true;
+  } catch { return false; }
+}
+
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+let state = {
+  confirmed: false,
+  entradaMin: 0,       // minute-of-day of entry
+  intervaloMin: 60,    // lunch duration in minutes
+  autoAlmocoStart: 0,  // auto lunch start (entry+4h)
+  autoAlmocoEnd: 0,    // auto lunch end
+  lunchMode: 'auto',   // 'auto' | 'manual-out' | 'manual-done'
+  manualAlmocoSaida: 0,
+  manualAlmocoRetorno: 0,
+  lunchPauseStart: null, // wall clock ms when pause started
+  lastAlert: null,       // '30'|'20'|'10'|'5'
+  popupLocked: false,
+  lunchOverdueShown: false,
+};
+
+let tickInterval = null;
+let cdInterval   = null;
+
+// ════════════════════════════════════════════
+//  HELPERS
+// ════════════════════════════════════════════
+function toMin(t) {
+  if (!t) return 0;
+  const [h,m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+function nowMin() {
+  const n = new Date();
+  return n.getHours() * 60 + n.getMinutes();
+}
+function nowSec() {
+  const n = new Date();
+  return n.getHours() * 3600 + n.getMinutes() * 60 + n.getSeconds();
+}
+function fmtHMS(s) {
+  s = Math.max(0, Math.round(s));
+  return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
+    .map(x => String(x).padStart(2,'0')).join(':');
+}
+function fmtHM(m) {
+  m = Math.max(0, Math.round(m));
+  return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+}
+function fmtDur(m) {
+  m = Math.max(0, Math.round(m));
+  if (m === 0) return '0 min';
+  const h = Math.floor(m/60), mm = m%60;
+  if (h === 0) return mm + 'min';
+  return mm === 0 ? h + 'h' : h + 'h ' + mm + 'min';
+}
+function fmtDate(iso) {
+  const [y,m,d] = iso.split('-');
+  return d + '/' + m + '/' + y;
+}
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+
+// ════════════════════════════════════════════
+//  SOUND (Web Audio API — soft chime)
+// ════════════════════════════════════════════
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function playChime(type = 'warn') {
+  try {
+    const ctx = getAudioCtx();
+    const freqs = type === 'danger' ? [440, 349, 294] : [523, 659, 784];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const t = ctx.currentTime + i * 0.25;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+  } catch(e) {}
+}
+
+// ── Continuous alarm (from 10min mark — stops only on confirmed exit) ──
+let continuousAlarmInterval = null;
+let continuousAlarmActive = false;
+
+function startContinuousAlarm() {
+  if (continuousAlarmActive) return;
+  continuousAlarmActive = true;
+  // Play immediately then every 30s
+  playAlarmPulse();
+  continuousAlarmInterval = setInterval(playAlarmPulse, 30000);
+}
+
+function stopContinuousAlarm() {
+  continuousAlarmActive = false;
+  if (continuousAlarmInterval) { clearInterval(continuousAlarmInterval); continuousAlarmInterval = null; }
+}
+
+function playAlarmPulse() {
+  try {
+    const ctx = getAudioCtx();
+    // Two gentle descending tones — not strident
+    [[494, 0], [440, 0.35], [392, 0.7]].forEach(([f, delay]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      const t = ctx.currentTime + delay;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.12, t + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+      osc.start(t); osc.stop(t + 0.65);
+    });
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════
+//  SIDEBAR CLOCK
+// ════════════════════════════════════════════
+function updateSidebarClock() {
+  const n = new Date();
+  document.getElementById('scTime').textContent =
+    [n.getHours(), n.getMinutes(), n.getSeconds()].map(x => String(x).padStart(2,'0')).join(':');
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  document.getElementById('scDate').textContent =
+    days[n.getDay()] + ', ' + n.toLocaleDateString('pt-BR', {day:'2-digit', month:'long'});
+  document.getElementById('todayLabel').textContent =
+    n.toLocaleDateString('pt-BR', {weekday:'long', day:'2-digit', month:'long', year:'numeric'});
+}
+setInterval(updateSidebarClock, 1000);
+updateSidebarClock();
+
+// ════════════════════════════════════════════
+//  ATIVAR PAINEL — função central usada por
+//  confirmarEntrada, ativarHojeFromPdf e F5
+// ════════════════════════════════════════════
+function ativarPainel() {
+  // Stats do topo
+  document.getElementById('statEntrada').textContent      = fmtHM(state.entradaMin);
+  document.getElementById('statSaidaNormal').textContent  = fmtHM((state.entradaMin + state.intervaloMin + 480) % 1440);
+  document.getElementById('statLimite').textContent       = fmtHM((state.entradaMin + state.intervaloMin + 600) % 1440);
+
+  // Campos de input
+  document.getElementById('inpEntrada').value   = fmtHM(state.entradaMin);
+  document.getElementById('inpIntervalo').value = fmtHM(state.intervaloMin);
+
+  // Almoço automático (sempre atualiza o range)
+  document.getElementById('lunchAutoRange').textContent =
+    fmtHM(state.autoAlmocoStart % 1440) + ' – ' + fmtHM(state.autoAlmocoEnd % 1440);
+
+  // Estado do almoço
+  if (state.lunchMode === 'manual-done') {
+    document.getElementById('inpAlmocoSaida').value      = fmtHM(state.manualAlmocoSaida);
+    document.getElementById('inpAlmocoRetorno').value    = fmtHM(state.manualAlmocoRetorno);
+    document.getElementById('inpAlmocoRetorno').disabled = false;
+    document.getElementById('lunchAutoNote').style.display         = 'none';
+    document.getElementById('btnSairAlmoco').textContent           = '✅ Almoço registrado';
+    document.getElementById('btnSairAlmoco').disabled              = true;
+    document.getElementById('btnRetornarAlmoco').style.display     = 'none';
+    const dur = state.manualAlmocoRetorno - state.manualAlmocoSaida;
+    const note = document.getElementById('lunchStatus');
+    note.className   = 'lunch-note ok show';
+    note.textContent = `✅ Almoço: ${fmtHM(state.manualAlmocoSaida)} – ${fmtHM(state.manualAlmocoRetorno)} (${fmtDur(dur)})`;
+
+  } else if (state.lunchMode === 'manual-out') {
+    document.getElementById('inpAlmocoSaida').value          = fmtHM(state.manualAlmocoSaida);
+    document.getElementById('inpAlmocoRetorno').disabled     = false;
+    document.getElementById('lunchAutoNote').style.display   = 'none';
+    document.getElementById('btnSairAlmoco').style.display   = 'none';
+    document.getElementById('btnRetornarAlmoco').style.display = 'inline-flex';
+    const note = document.getElementById('lunchStatus');
+    note.className   = 'lunch-note pause show';
+    note.textContent = `⏸ Em almoço desde ${fmtHM(state.manualAlmocoSaida)} — registre o retorno.`;
+    if (!state.lunchPauseStart) state.lunchPauseStart = Date.now();
+
+  } else {
+    // auto — reset botões
+    document.getElementById('lunchAutoNote').style.display         = 'block';
+    document.getElementById('btnSairAlmoco').style.display         = 'inline-flex';
+    document.getElementById('btnSairAlmoco').disabled              = false;
+    document.getElementById('btnSairAlmoco').textContent           = '🍽 Bater ponto — saída almoço';
+    document.getElementById('btnRetornarAlmoco').style.display     = 'none';
+    document.getElementById('lunchStatus').className               = 'lunch-note';
+    document.getElementById('inpAlmocoSaida').value                = '';
+    document.getElementById('inpAlmocoRetorno').value              = '';
+    document.getElementById('inpAlmocoRetorno').disabled           = true;
+  }
+
+  // Mostrar painel de trabalho
+  document.getElementById('setupPanel').style.display = 'none';
+  document.getElementById('workPanel').style.display  = 'block';
+  document.getElementById('popupOverlay').classList.remove('show');
+
+  // Nível 1 — marcador contratual + padrão semanal
+  updateContratualMarker();
+  checkWeeklyPattern();
+
+  // Restore planned exit if in state
+  if (state.saidaPlanejadaMin) {
+    document.getElementById('inpSaidaPlanejada').value = fmtHM(state.saidaPlanejadaMin);
+    onSaidaPlanejadaChange();
+    // Restore alarm timeout if still in the future
+    if (state.browserAlarmTime) {
+      const alarmMin = toMin(state.browserAlarmTime);
+      const diffMs   = (alarmMin - nowMin()) * 60 * 1000;
+      if (diffMs > 0) {
+        browserAlarmTimeout = setTimeout(() => dispararAlarmeBrowser(state.browserAlarmTime), diffMs);
+        const btn = document.getElementById('btnCriarAlarme');
+        if (btn) {
+          btn.style.display    = 'inline-flex';
+          btn.textContent      = `🔔 Alarme definido — ${state.browserAlarmTime}`;
+          btn.style.background = 'var(--ok)';
+          btn.style.color      = '#000';
+          btn.onclick          = cancelarAlarmeBrowser;
+        }
+      }
+    }
+  }
+
+  // Iniciar tick
+  if (tickInterval) clearInterval(tickInterval);
+  tickInterval = setInterval(tick, 1000);
+  tick();
+}
+
+// ════════════════════════════════════════════
+//  RESTORE STATE ON PAGE LOAD (F5 / reopen)
+// ════════════════════════════════════════════
+(function restoreOnLoad() {
+  if (!loadPersistedState()) return;
+  ativarPainel();
+})();
+
+// ════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════
+function nav(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('nav-' + id).classList.add('active');
+  if (id === 'historico') renderHist();
+  if (id === 'resumo') renderResumo();
+  if (id === 'importar') resetImport();
+}
+
+// ════════════════════════════════════════════
+//  CONFIRMAR ENTRADA
+// ════════════════════════════════════════════
+function confirmarEntrada() {
+  const entrada = document.getElementById('inpEntrada').value;
+  const intervalo = document.getElementById('inpIntervalo').value;
+  if (!entrada) { alert('Informe o horário de entrada.'); return; }
+
+  state.entradaMin      = toMin(entrada);
+  state.intervaloMin    = toMin(intervalo) || 60;
+  state.autoAlmocoStart = state.entradaMin + 240;
+  state.autoAlmocoEnd   = state.autoAlmocoStart + state.intervaloMin;
+  state.confirmed       = true;
+  state.lunchMode       = 'auto';
+  state.lastAlert       = null;
+  state.popupLocked     = false;
+  state.lunchPauseStart = null;
+  state.lunchOverdueShown = false;
+
+  persistState();
+  ativarPainel();
+}
+
+// ════════════════════════════════════════════
+//  ATIVAR HOJE A PARTIR DO PDF
+// ════════════════════════════════════════════
+function ativarHojeFromPdf(row) {
+  // Preenche os campos de entrada
+  document.getElementById('inpEntrada').value  = row.entrada;
+  document.getElementById('inpIntervalo').value = fmtHM(row.lunchDur || 60);
+
+  // Monta o state como se o usuário tivesse confirmado manualmente
+  state.entradaMin      = toMin(row.entrada);
+  state.intervaloMin    = row.lunchDur || 60;
+  state.autoAlmocoStart = state.entradaMin + 240;
+  state.autoAlmocoEnd   = state.autoAlmocoStart + state.intervaloMin;
+  state.confirmed       = true;
+  state.lastAlert       = null;
+  state.popupLocked     = false;
+  state.lunchPauseStart = null;
+  state.lunchOverdueShown = false;
+
+  // Almoço já registrado?
+  const temSaidaAlmoco   = row.almocoS && row.almocoS !== '—';
+  const temRetornoAlmoco = row.almocoR && row.almocoR !== '—';
+
+  if (temSaidaAlmoco && temRetornoAlmoco) {
+    state.lunchMode = 'manual-done';
+    state.manualAlmocoSaida   = toMin(row.almocoS);
+    state.manualAlmocoRetorno = toMin(row.almocoR);
+  } else if (temSaidaAlmoco) {
+    state.lunchMode = 'manual-out';
+    state.manualAlmocoSaida = toMin(row.almocoS);
+    state.lunchPauseStart   = Date.now();
+  } else {
+    state.lunchMode = 'auto';
+    state.manualAlmocoSaida   = 0;
+    state.manualAlmocoRetorno = 0;
+  }
+
+  // Se já tem saída, preencher campo
+  if (row.saida && row.saida !== '—') {
+    document.getElementById('inpSaida').value = row.saida;
+  }
+
+  persistState();
+  ativarPainel();
+
+  // Toast
+  const banner = document.getElementById('alertBanner');
+  banner.className = 'alert info show';
+  document.getElementById('alertIco').textContent   = '📄';
+  document.getElementById('alertTitle').textContent = 'Jornada carregada do PDF!';
+  document.getElementById('alertDesc').textContent  =
+    `Entrada ${row.entrada}${temRetornoAlmoco ? ', almoço ' + row.almocoS + '–' + row.almocoR : ''}. Relógio iniciado retroativamente.`;
+  setTimeout(() => { banner.className = 'alert'; }, 6000);
+}
+
+// ── Alert thresholds (must be before tick) ──
+
+function tick() {
+  if (!state.confirmed) return;
+
+  const currentSec = nowSec();
+  const entrySec   = state.entradaMin * 60;
+
+  // Net worked seconds
+  let netSec = currentSec - entrySec;
+
+  // Deduct lunch
+  const lunchSec = effectiveLunchSec(currentSec);
+  netSec -= lunchSec;
+  netSec = Math.max(0, netSec);
+
+  // If currently on lunch pause — freeze clock
+  const onPause = state.lunchMode === 'manual-out';
+  if (onPause) {
+    // Check if 2h of lunch overdue
+    if (!state.lunchOverdueShown && state.lunchPauseStart !== null) {
+      const pausedMin = (Date.now() - state.lunchPauseStart) / 60000;
+      if (pausedMin >= 120) {
+        state.lunchOverdueShown = true;
+        showPopupLunch();
+      }
+    }
+  }
+
+  const netMin = Math.floor(netSec / 60);
+  const extraMin = Math.max(0, netMin - 480);
+  const restMin  = Math.max(0, 600 - netMin);
+
+  // Big clock
+  const clk = document.getElementById('bigClock');
+  clk.textContent = fmtHMS(netSec);
+
+  let clkClass = 'bigclock';
+  if (onPause) clkClass += ' pause';
+  else if (netMin >= 570) clkClass += ' danger';
+  else if (netMin >= 480) clkClass += ' warn';
+  else clkClass += ' ok';
+  clk.className = clkClass;
+
+  const subLabels = {
+    pause: '⏸ em pausa de almoço',
+    ok: netMin < 480 ? 'dentro da jornada normal' : 'jornada normal encerrada',
+    warn: 'horas extras em andamento',
+    danger: 'próximo ao limite legal',
+  };
+  const subKey = onPause ? 'pause' : clkClass.split(' ')[1] || 'ok';
+  document.getElementById('bigSub').textContent = subLabels[subKey] || '';
+
+  // Progress (10h = 100%)
+  const pct = Math.min((netMin / 600) * 100, 100);
+  const fill = document.getElementById('progFill');
+  fill.style.width = pct + '%';
+  fill.className = 'prog-fill ' + (onPause ? 'pause' : subKey === 'danger' ? 'danger' : subKey === 'warn' ? 'warn' : 'ok');
+
+  // Stats
+  document.getElementById('statRest').textContent = restMin > 0 ? fmtDur(restMin) : '⛔';
+  const rb = document.getElementById('statRestBox');
+  rb.className = 'sbox ' + (restMin > 60 ? 'ok' : restMin > 0 ? 'warn' : 'danger');
+
+  // Extra display
+  document.getElementById('extraDisplay').textContent = extraMin > 0 ? '+' + fmtDur(extraMin) : '0h 00min';
+
+  // Status chip
+  const chip = document.getElementById('statusChip');
+  if (onPause) { chip.className = 'chip pause'; chip.textContent = 'Em almoço'; }
+  else if (netMin < 480) { chip.className = 'chip ok'; chip.textContent = 'Normal'; }
+  else if (netMin < 570) { chip.className = 'chip warn'; chip.textContent = 'Atenção'; }
+  else { chip.className = 'chip danger'; chip.textContent = 'Crítico'; }
+
+  // Alert banner
+  updateBanner(netMin, restMin, onPause);
+
+  // Popup alerts (only if not on lunch and not already locked)
+  if (!onPause && !state.popupLocked) checkAlerts(restMin);
+
+  // ── Nível 1 hooks ──
+  updateObsRequired(netMin);
+  updateSaidaPlanejadaCountdown(netMin);
+
+  // Planned exit alert — 15min warning based on planned time, not legal limit
+  if (state.saidaPlanejadaMin && !onPause) {
+    const restPlanned = state.saidaPlanejadaMin - nowMin();
+    if (restPlanned === 15 && state.lastAlert !== 'planned15') {
+      state.lastAlert = 'planned15';
+      showAlert({ restMax:15, restMin:14, key:'planned15', type:'warn', lock:false,
+        ico:'✈', title:'Faltam 15 minutos para sua saída planejada!',
+        text:`Você planejou sair às ${fmtHM(state.saidaPlanejadaMin)}. Comece a organizar suas pendências.` });
+    }
+  }
+}
+
+// ════════════════════════════════════════════
+//  EFFECTIVE LUNCH DEDUCTION (seconds)
+// ════════════════════════════════════════════
+function effectiveLunchSec(currentSec) {
+  if (state.lunchMode === 'auto') {
+    // Deduct auto lunch if current time is past lunch window
+    const lunchStartSec = state.autoAlmocoStart * 60;
+    const lunchEndSec   = state.autoAlmocoEnd   * 60;
+    if (currentSec <= lunchStartSec) return 0;
+    if (currentSec >= lunchEndSec) return state.intervaloMin * 60;
+    return currentSec - lunchStartSec;
+  }
+  if (state.lunchMode === 'manual-out') {
+    // Still on lunch — deduct from exit to now
+    const lunchOutSec = state.manualAlmocoSaida * 60;
+    return Math.max(0, currentSec - lunchOutSec);
+  }
+  if (state.lunchMode === 'manual-done') {
+    return (state.manualAlmocoRetorno - state.manualAlmocoSaida) * 60;
+  }
+  return 0;
+}
+
+// ════════════════════════════════════════════
+//  LUNCH BUTTONS
+// ════════════════════════════════════════════
+function sairAlmoco() {
+  const val = document.getElementById('inpAlmocoSaida').value;
+  const saida = val ? toMin(val) : nowMin();
+  if (!val) document.getElementById('inpAlmocoSaida').value = fmtHM(saida);
+
+  state.lunchMode = 'manual-out';
+  state.manualAlmocoSaida = saida;
+  state.lunchPauseStart = Date.now();
+  state.lunchOverdueShown = false;
+
+  document.getElementById('inpAlmocoRetorno').disabled = false;
+  document.getElementById('btnSairAlmoco').style.display = 'none';
+  document.getElementById('btnRetornarAlmoco').style.display = 'inline-flex';
+
+  const note = document.getElementById('lunchStatus');
+  note.className = 'lunch-note pause show';
+  note.textContent = '⏸ Relógio pausado — aguardando retorno do almoço.';
+  persistState();
+}
+
+function retornarAlmoco() {
+  const val = document.getElementById('inpAlmocoRetorno').value;
+  const retorno = val ? toMin(val) : nowMin();
+  if (!val) document.getElementById('inpAlmocoRetorno').value = fmtHM(retorno);
+
+  const dur = retorno - state.manualAlmocoSaida;
+  state.lunchMode = 'manual-done';
+  state.manualAlmocoRetorno = retorno;
+  state.lunchPauseStart = null;
+
+  document.getElementById('btnRetornarAlmoco').style.display = 'none';
+  document.getElementById('btnSairAlmoco').style.display = 'inline-flex';
+  document.getElementById('btnSairAlmoco').textContent = '✅ Almoço registrado';
+  document.getElementById('btnSairAlmoco').disabled = true;
+
+  const note = document.getElementById('lunchStatus');
+  if (dur < 60) {
+    note.className = 'lunch-note danger show';
+    note.textContent = `⛔ Pausa de ${fmtDur(dur)} — abaixo do mínimo legal de 1h. Possível infração trabalhista!`;
+  } else {
+    note.className = 'lunch-note ok show';
+    note.textContent = `✅ Almoço de ${fmtDur(dur)} registrado. Relógio retomado.`;
+  }
+
+  // Update auto note
+  document.getElementById('lunchAutoNote').style.display = 'none';
+  persistState();
+  tick();
+}
+
+// ════════════════════════════════════════════
+//  ALERT BANNER
+// ════════════════════════════════════════════
+function updateBanner(netMin, restMin, onPause) {
+  const b = document.getElementById('alertBanner');
+  const ico = document.getElementById('alertIco');
+  const title = document.getElementById('alertTitle');
+  const desc  = document.getElementById('alertDesc');
+
+  if (onPause) {
+    b.className = 'alert pause show';
+    ico.textContent = '⏸';
+    title.textContent = 'Em pausa de almoço — relógio pausado';
+    desc.textContent  = 'Bata o ponto de retorno quando voltar ao trabalho.';
+    return;
+  }
+  if (netMin < 480) { b.className = 'alert'; return; }
+  if (netMin < 510) {
+    b.className = 'alert warn show'; ico.textContent = '⚠️';
+    title.textContent = 'Jornada normal encerrada — horas extras em andamento';
+    desc.textContent  = `Você tem até ${fmtDur(restMin)} antes de atingir o limite legal.`;
+    return;
+  }
+  if (netMin < 570) {
+    b.className = 'alert warn show'; ico.textContent = '🔔';
+    title.textContent = `Alerta — faltam ${fmtDur(restMin)} para o limite!`;
+    desc.textContent  = 'Organize-se para encerrar o expediente em breve.';
+    return;
+  }
+  if (netMin < 600) {
+    b.className = 'alert danger show'; ico.textContent = '🚨';
+    title.textContent = `CRÍTICO — apenas ${fmtDur(restMin)} restantes!`;
+    desc.textContent  = 'Registre sua saída imediatamente.';
+    return;
+  }
+  b.className = 'alert danger show'; ico.textContent = '⛔';
+  title.textContent = 'Limite legal ultrapassado!';
+  desc.textContent  = 'Acione o RH para regularização da ocorrência.';
+}
+
+// ════════════════════════════════════════════
+//  POPUP ALERTS
+// ════════════════════════════════════════════
+function checkAlerts(restMin) {
+  for (const t of ALERT_THRESHOLDS) {
+    if (restMin <= t.restMax && restMin > t.restMin - 1 && state.lastAlert !== t.key) {
+      state.lastAlert = t.key;
+      showAlert(t);
+      return;
+    }
+  }
+}
+
+function showAlert(t) {
+  const overlay = document.getElementById('popupOverlay');
+  const box     = document.getElementById('popupBox');
+  document.getElementById('popIco').textContent   = t.ico;
+  document.getElementById('popTitle').textContent = t.title;
+  document.getElementById('popTitle').className   = 'popup-title ' + t.type;
+  document.getElementById('popText').textContent  = t.text;
+  box.className = 'popup-box ' + t.type;
+
+  const saveBtn    = document.getElementById('popSave');
+  const dismissBtn = document.getElementById('popDismiss');
+  const countdown  = document.getElementById('popCountdown');
+
+  sendOsNotif(t.title, t.text, t.type);
+  startTitleFlash(t.type === 'danger' ? '🚨 ALERTA — Jornada' : '⚠️ ATENÇÃO — Jornada');
+
+  if (t.lock) {
+    // 5 min — tela travada, som só para ao confirmar saída
+    state.popupLocked = true;
+    overlay.style.pointerEvents = 'all';
+    saveBtn.style.display    = 'inline-flex';
+    saveBtn.textContent      = '✅ Confirmar saída e parar alarme';
+    dismissBtn.style.display = 'none';
+    countdown.style.display  = 'block';
+    startCountdown(5 * 60);
+    if (!browserAlarmActive) dispararSomProgressivo('lock');
+  } else if (t.key === '10') {
+    // 10 min — som contínuo, pode dispensar popup mas som persiste
+    saveBtn.style.display    = 'inline-flex';
+    saveBtn.textContent      = '✅ Confirmar saída e parar alarme';
+    dismissBtn.style.display = 'inline-flex';
+    dismissBtn.textContent   = 'Dispensar aviso (som continua)';
+    countdown.style.display  = 'none';
+    if (cdInterval) clearInterval(cdInterval);
+    dispararSomProgressivo('continuo');
+  } else {
+    // 30 e 20 min — som para ao dispensar
+    saveBtn.style.display    = 'none';
+    dismissBtn.style.display = 'inline-flex';
+    dismissBtn.textContent   = 'Entendido';
+    countdown.style.display  = 'none';
+    if (cdInterval) clearInterval(cdInterval);
+    dispararSomProgressivo('curto');
+  }
+  overlay.classList.add('show');
+}
+
+// ── Som progressivo: reusa o engine do alarme de saída planejada ──
+// 'curto'   → 30/20min: para ao dispensar
+// 'continuo'→ 10min: para só ao confirmar saída
+// 'lock'    → 5min: idem, tela travada
+let alertSomTipo = '';
+
+function dispararSomProgressivo(tipo) {
+  alertSomTipo = tipo;
+  browserAlarmActive = true;
+  if (browserAlarmAudioCtx) { try { browserAlarmAudioCtx.close(); } catch(e) {} }
+  browserAlarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  browserAlarmNodes = [];
+  tocarCicloAlarme();
+}
+
+function pararSomAlerta() {
+  browserAlarmActive = false;
+  if (browserAlarmTimeout) { clearTimeout(browserAlarmTimeout); browserAlarmTimeout = null; }
+  browserAlarmNodes.forEach(n => { try { n.stop(); } catch(e) {} });
+  browserAlarmNodes = [];
+  if (browserAlarmAudioCtx) { try { browserAlarmAudioCtx.close(); } catch(e) {} browserAlarmAudioCtx = null; }
+}
+
+function showPopupLunch() {
+  document.getElementById('popIco').textContent   = '🍽';
+  document.getElementById('popTitle').textContent = 'Você está há mais de 2 horas no almoço!';
+  document.getElementById('popTitle').className   = 'popup-title pause';
+  document.getElementById('popText').textContent  = 'O relógio está pausado. Volte ao trabalho e registre seu retorno.';
+  document.getElementById('popupBox').className   = 'popup-box pause';
+  document.getElementById('popSave').style.display    = 'none';
+  document.getElementById('popDismiss').style.display = 'inline-flex';
+  document.getElementById('popDismiss').textContent   = 'Entendido';
+  document.getElementById('popCountdown').style.display = 'none';
+  dispararSomProgressivo('curto');
+  document.getElementById('popupOverlay').classList.add('show');
+}
+
+function startCountdown(secs) {
+  if (cdInterval) clearInterval(cdInterval);
+  const el = document.getElementById('popCountdown');
+  cdInterval = setInterval(() => {
+    secs = Math.max(0, secs - 1);
+    el.textContent = fmtHMS(secs);
+    if (secs === 0) { clearInterval(cdInterval); el.textContent = '⛔ Esgotado'; }
+  }, 1000);
+}
+
+function dismissPopup() {
+  document.getElementById('popupOverlay').classList.remove('show');
+  // 30/20min e almoço: para o som ao dispensar
+  // 10/5min: som continua até confirmar saída
+  if (alertSomTipo === 'curto') {
+    pararSomAlerta();
+    stopTitleFlash();
+  }
+  document.getElementById('popDismiss').textContent = 'Entendido';
+}
+
+function confirmarSaidaDoPopup() {
+  const n = new Date();
+  const hm = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  document.getElementById('inpSaida').value = hm;
+  state.popupLocked = false;
+  if (cdInterval) clearInterval(cdInterval);
+  // Para tudo — alertas progressivos + alarme planejado + title flash
+  pararSomAlerta();
+  pararAlarmeBrowser();
+  stopContinuousAlarm();
+  stopTitleFlash();
+  document.getElementById('popupOverlay').classList.remove('show');
+  salvarDia();
+}
+
+// ════════════════════════════════════════════
+//  SAVE DAY
+// ════════════════════════════════════════════
+function salvarDia() {
+  const saida = document.getElementById('inpSaida').value;
+  if (!saida) { alert('Informe o horário de saída antes de salvar.'); return; }
+
+  const saidaMin = toMin(saida);
+  let lunchDur = state.intervaloMin;
+  if (state.lunchMode === 'manual-done') lunchDur = state.manualAlmocoRetorno - state.manualAlmocoSaida;
+
+  const netMin = Math.max(0, saidaMin - state.entradaMin - lunchDur);
+  const obs    = document.getElementById('inpObs').value.trim();
+
+  // Obs obrigatória acima de 8h
+  if (netMin > 480 && !obs) {
+    const el = document.getElementById('inpObs');
+    el.focus();
+    el.style.borderColor = 'var(--danger)';
+    setTimeout(() => el.style.borderColor = '', 2500);
+    alert('⚠️ Você está acima de 8h trabalhadas.\n\nO campo de observação é obrigatório — descreva o motivo da hora extra.');
+    return;
+  }
+
+  const extra  = Math.max(0, netMin - 480);
+  const status = netMin > 570 ? 'danger' : netMin > 480 ? 'warn' : 'ok';
+
+  const almocoS = state.lunchMode === 'manual-done' ? fmtHM(state.manualAlmocoSaida)   : fmtHM(state.autoAlmocoStart);
+  const almocoR = state.lunchMode === 'manual-done' ? fmtHM(state.manualAlmocoRetorno) : fmtHM(state.autoAlmocoEnd);
+
+  const rec = {
+    date: todayISO(),
+    entrada: fmtHM(state.entradaMin),
+    saida, almocoS, almocoR,
+    lunchDur, netMin, extra, status, obs,
+    lunchMode: state.lunchMode,
+    tipo: 'trabalho', source: 'manual',
+  };
+
+  const hist = loadHist();
+  const idx  = hist.findIndex(r => r.date === rec.date);
+  if (idx >= 0) hist[idx] = rec; else hist.unshift(rec);
+  saveHist(hist);
+
+  alert('✅ Registro do dia salvo com sucesso!');
+  stopContinuousAlarm();
+  stopTitleFlash();
+  resetJornada();
+}
+
+// ════════════════════════════════════════════
+//  RESET
+// ════════════════════════════════════════════
+function resetJornada() {
+  if (tickInterval) clearInterval(tickInterval);
+  if (cdInterval)   clearInterval(cdInterval);
+  state = { confirmed:false, entradaMin:0, intervaloMin:60, autoAlmocoStart:0, autoAlmocoEnd:0,
+    lunchMode:'auto', manualAlmocoSaida:0, manualAlmocoRetorno:0,
+    lunchPauseStart:null, lastAlert:null, popupLocked:false, lunchOverdueShown:false };
+
+  document.getElementById('setupPanel').style.display = 'block';
+  document.getElementById('workPanel').style.display  = 'none';
+  document.getElementById('popupOverlay').classList.remove('show');
+  document.getElementById('alertBanner').className = 'alert';
+  document.getElementById('statusChip').className  = 'chip idle';
+  document.getElementById('statusChip').textContent = 'Aguardando';
+  document.getElementById('bigClock').textContent  = '00:00:00';
+  document.getElementById('bigClock').className    = 'bigclock ok';
+  document.getElementById('bigSub').textContent    = 'aguardando início';
+  document.getElementById('progFill').style.width  = '0%';
+  document.getElementById('inpSaida').value        = '';
+  document.getElementById('inpObs').value          = '';
+  document.getElementById('inpAlmocoSaida').value  = '';
+  document.getElementById('inpAlmocoRetorno').value = '';
+  document.getElementById('inpAlmocoRetorno').disabled = true;
+  document.getElementById('btnSairAlmoco').style.display    = 'inline-flex';
+  document.getElementById('btnSairAlmoco').disabled = false;
+  document.getElementById('btnSairAlmoco').textContent = '🍽 Bater ponto — saída almoço';
+  document.getElementById('btnRetornarAlmoco').style.display = 'none';
+  document.getElementById('lunchStatus').className = 'lunch-note';
+  document.getElementById('lunchAutoNote').style.display = 'block';
+  localStorage.removeItem(STATE_KEY); // limpa estado salvo ao resetar
+}
+
+// ════════════════════════════════════════════
+//  RENDER HISTORY
+// ════════════════════════════════════════════
+function renderHist() {
+  const hist = loadHist();
+  const tbody = document.getElementById('histBody');
+  if (!hist.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px">Nenhum registro ainda.</td></tr>';
+    return;
+  }
+  const labels = { ok:'Normal', warn:'Atenção', danger:'Crítico', ferias:'Férias', falta:'Falta', folga:'Folga' };
+  const chipColors = { ok:'ok', warn:'warn', danger:'danger', ferias:'info', falta:'danger', folga:'' };
+  tbody.innerHTML = hist.map((r, i) => {
+    const chipCls = chipColors[r.status] || 'idle';
+    const sourceIcon = r.source === 'pdf' ? ' <span title="Importado do PDF" style="font-size:0.65rem;color:var(--muted)">📄</span>' : '';
+    const isSpecial = ['ferias','falta','folga'].includes(r.status);
+    const isFalta = r.status === 'falta';
+
+    // Edit button for falta — inline dropdown
+    const editBtn = isFalta ? `
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:0.7rem;margin-right:4px;color:var(--warn);border-color:var(--warn)" onclick="editFalta(${i})" title="Classificar ausência">✏️</button>` : '';
+
+    return `
+    <tr id="hist-row-${i}" style="${r.status==='ferias'?'background:#e8f0fc33':r.status==='falta'?'background:#fdecea33':r.status==='folga'?'opacity:0.6':''}">
+      <td><strong>${fmtDate(r.date)}</strong>${sourceIcon}</td>
+      <td style="font-family:'DM Mono',monospace">${isSpecial ? '—' : (r.entrada||'—')}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:0.73rem">${isSpecial ? '—' : ((r.almocoS||'—') + ' – ' + (r.almocoR||'—'))}</td>
+      <td style="font-family:'DM Mono',monospace">${isSpecial ? '—' : (r.saida||'—')}</td>
+      <td style="font-family:'DM Mono',monospace">${isSpecial ? '—' : fmtDur(r.netMin||0)}</td>
+      <td style="font-family:'DM Mono',monospace;color:${(r.extra||0) > 0 ? 'var(--warn)' : 'var(--muted)'}">${(r.extra||0) > 0 ? '+' + fmtDur(r.extra) : '—'}</td>
+      <td><span class="chip ${chipCls}">${labels[r.status]||r.status}</span></td>
+      <td style="font-size:0.72rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.obs||''}">${r.obs||'—'}</td>
+      <td style="white-space:nowrap">${editBtn}<button class="btn btn-ghost" style="padding:4px 10px;font-size:0.7rem" onclick="delRec(${i})">🗑</button></td>
+    </tr>
+    <tr id="hist-edit-${i}" style="display:none;background:#fef7e6">
+      <td colspan="9" style="padding:12px 16px">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--warn);margin-bottom:10px">✏️ Classificar ausência — ${fmtDate(r.date)}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          ${['Feriado','Ponte','Atestado médico','Licença','Abono','Compensação','Home office','Outro'].map(op =>
+            `<button class="btn btn-ghost" style="font-size:0.75rem;padding:5px 12px" onclick="applyFaltaLabel(${i},'${op}')">${op}</button>`
+          ).join('')}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="falta-obs-${i}" class="inp" style="flex:1;font-size:0.82rem;padding:7px 10px" placeholder="Ou digite uma descrição personalizada..." value="${r.obs||''}">
+          <button class="btn btn-ok" style="padding:7px 14px;font-size:0.82rem" onclick="saveFaltaObs(${i})">💾 Salvar</button>
+          <button class="btn btn-ghost" style="padding:7px 12px;font-size:0.82rem" onclick="cancelEditFalta(${i})">Cancelar</button>
+        </div>
+      </td>
+    </tr>`}).join('');
+}
+
+function editFalta(i) {
+  // Close any other open edit rows
+  document.querySelectorAll('[id^="hist-edit-"]').forEach(el => el.style.display = 'none');
+  document.getElementById('hist-edit-' + i).style.display = 'table-row';
+}
+
+function cancelEditFalta(i) {
+  document.getElementById('hist-edit-' + i).style.display = 'none';
+}
+
+function applyFaltaLabel(i, label) {
+  document.getElementById('falta-obs-' + i).value = label;
+  saveFaltaObs(i);
+}
+
+function saveFaltaObs(i) {
+  const obs = document.getElementById('falta-obs-' + i).value.trim();
+  const h = loadHist();
+  if (h[i]) { h[i].obs = obs; saveHist(h); }
+  renderHist();
+}
+
+function delRec(i) {
+  if (!confirm('Apagar este registro?')) return;
+  const h = loadHist(); h.splice(i,1); saveHist(h); renderHist();
+}
+
+// ════════════════════════════════════════════
+//  RENDER RESUMO
+// ════════════════════════════════════════════
+function renderResumo() {
+  const hist = loadHist();
+  const workDays = hist.filter(r => r.tipo === 'trabalho' || (!r.tipo && r.netMin !== undefined));
+  const ok     = workDays.filter(r => (r.netMin||0) <= 480).length;
+  const warn   = workDays.filter(r => (r.netMin||0) > 480 && (r.netMin||0) <= 570).length;
+  const danger = workDays.filter(r => (r.netMin||0) > 570).length;
+  const ferias = hist.filter(r => r.status === 'ferias').length;
+  const faltas = hist.filter(r => r.status === 'falta').length;
+  document.getElementById('sumOk').textContent     = ok;
+  document.getElementById('sumWarn').textContent   = warn;
+  document.getElementById('sumDanger').textContent = danger;
+
+  // Weekly chart — last 7 work days
+  const last7 = workDays.slice(0, 7).reverse();
+  const wc = document.getElementById('weekChart');
+  if (!last7.length) { wc.innerHTML = '<div style="color:var(--muted);font-size:0.8rem">Sem dados.</div>'; }
+  else {
+    const mx = Math.max(...last7.map(r => r.netMin||0), 600);
+    wc.innerHTML = last7.map(r => {
+      const pct   = ((r.netMin||0) / mx) * 100;
+      const color = (r.netMin||0) > 570 ? 'danger' : (r.netMin||0) > 480 ? 'warn' : 'ok';
+      const [,m,d] = r.date.split('-');
+      return `<div class="wbar-wrap">
+        <div class="wbar-val" style="color:var(--${color})">${fmtDur(r.netMin||0)}</div>
+        <div class="wbar ${color}" style="height:${Math.max(pct,4)}%"></div>
+        <div class="wbar-label">${d}/${m}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Risk bars
+  const total = workDays.length || 1;
+  document.getElementById('riskBars').innerHTML = [
+    { label: 'Normal (≤8h)', count: ok, color: 'var(--ok)' },
+    { label: 'Atenção (8h–9h30)', count: warn, color: 'var(--warn)' },
+    { label: 'Crítico (>9h30)', count: danger, color: 'var(--danger)' },
+    { label: 'Férias', count: ferias, color: 'var(--info)' },
+    { label: 'Faltas', count: faltas, color: 'var(--danger)' },
+  ].map(r => `
+    <div class="risk-row">
+      <div class="risk-header">
+        <span style="font-size:0.78rem">${r.label}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--muted)">${r.count} dias · ${Math.round(r.count/total*100)}%</span>
+      </div>
+      <div class="risk-bar-bg"><div class="risk-bar" style="width:${r.count/total*100}%;background:${r.color}"></div></div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════
+//  EXPORT EXCEL
+// ════════════════════════════════════════════
+function exportExcel() {
+  const hist = loadHist();
+  if (!hist.length) { alert('Nenhum registro para exportar.'); return; }
+  const labels = { ok:'Normal', warn:'Atenção', danger:'Crítico', ferias:'Férias', falta:'Falta', folga:'Folga/DSR' };
+  const rows = [['Data','Dia','Tipo','Entrada','Saída Almoço','Retorno Almoço','Saída','Intervalo (min)','Trabalhado (min)','Extra (min)','Status','Fonte','Observação']];
+  hist.forEach(r => rows.push([
+    fmtDate(r.date), r.dow||'',
+    r.tipo||'trabalho',
+    r.entrada||'—', r.almocoS||'—', r.almocoR||'—', r.saida||'—',
+    r.lunchDur||0, r.netMin||0, r.extra||0,
+    labels[r.status]||r.status,
+    r.source==='pdf'?'PDF':'Manual',
+    r.obs||''
+  ]));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [12,6,10,8,12,14,8,16,18,14,10,8,40].map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Jornadas');
+
+  const workDays = hist.filter(r => r.tipo==='trabalho'||(!r.tipo&&(r.netMin||0)>0));
+  const ws2 = XLSX.utils.aoa_to_sheet([
+    ['Resumo'],
+    ['Total de dias', hist.length],
+    ['Dias trabalhados', workDays.length],
+    ['Normais (≤8h)', workDays.filter(r=>(r.netMin||0)<=480).length],
+    ['Atenção (8–9h30)', workDays.filter(r=>(r.netMin||0)>480&&(r.netMin||0)<=570).length],
+    ['Críticos (>9h30)', workDays.filter(r=>(r.netMin||0)>570).length],
+    ['Férias', hist.filter(r=>r.status==='ferias').length],
+    ['Faltas', hist.filter(r=>r.status==='falta').length],
+    ['Total extra (min)', hist.reduce((a,r)=>a+(r.extra||0),0)],
+  ]);
+  ws2['!cols'] = [{wch:28},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Resumo');
+  XLSX.writeFile(wb, 'jornada_' + todayISO() + '.xlsx');
+}
+
+function clearAll() {
+  if (!confirm('Apagar TODOS os registros? Esta ação não pode ser desfeita.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  alert('Dados apagados.');
+}
+
+// ════════════════════════════════════════════
+//  OS NOTIFICATIONS
+// ════════════════════════════════════════════
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+function sendOsNotif(title, body, urgency) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const n = new Notification('⏱ Monitor de Jornada — ' + title, {
+    body,
+    requireInteraction: urgency === 'danger',
+    tag: 'jornada-alert',
+  });
+  n.onclick = () => { window.focus(); n.close(); };
+}
+
+requestNotifPermission();
+
+// ════════════════════════════════════════════
+//  TAB TITLE FLASHING
+// ════════════════════════════════════════════
+let titleFlashInterval = null;
+let titleFlashActive   = false;
+const ORIGINAL_TITLE   = 'Monitor de Jornada';
+
+function startTitleFlash(msg) {
+  if (titleFlashActive) return;
+  titleFlashActive = true;
+  let toggle = false;
+  titleFlashInterval = setInterval(() => {
+    document.title = toggle ? msg : ORIGINAL_TITLE;
+    toggle = !toggle;
+  }, 900);
+}
+
+function stopTitleFlash() {
+  if (titleFlashInterval) clearInterval(titleFlashInterval);
+  titleFlashActive = false;
+  document.title = ORIGINAL_TITLE;
+}
+
+// ════════════════════════════════════════════
+//  TEST HELPER
+// ════════════════════════════════════════════
+function testarAlerta(min) {
+  if (!state.confirmed) { alert('Confirme a entrada primeiro.'); return; }
+  // Find threshold
+  const t = ALERT_THRESHOLDS.find(x => String(x.restMax) === String(min) || x.key === String(min));
+  if (!t) return;
+  state.lastAlert = null; // allow re-fire
+  showAlert(t);
+}
+
+function testarTodos() {
+  if (!state.confirmed) { alert('Confirme a entrada primeiro.'); return; }
+  let i = 0;
+  const seq = ['30','20','10','5'];
+  function next() {
+    if (i >= seq.length) return;
+    const key = seq[i++];
+    const t = ALERT_THRESHOLDS.find(x => x.key === key);
+    if (!t) { next(); return; }
+    state.lastAlert = null;
+    showAlert(t);
+    if (!t.lock) {
+      setTimeout(() => {
+        document.getElementById('popupOverlay').classList.remove('show');
+        setTimeout(next, 600);
+      }, 3000);
+    }
+  }
+  next();
+}
+
+// ════════════════════════════════════════════
+//  NÍVEL 1 — MELHORIAS
+// ════════════════════════════════════════════
+
+// ── 1. Marcador contratual na barra ─────────
+function updateContratualMarker() {
+  if (!state.confirmed) return;
+  // Contractual end = entrada + intervalo + 8h (net)
+  const contratualMin  = state.entradaMin + state.intervaloMin + 480;
+  const limiteMin      = state.entradaMin + state.intervaloMin + 600; // 10h
+  const totalSpan      = 600; // 10h = 100% of bar
+  const contratualOff  = contratualMin - state.entradaMin - state.intervaloMin; // minutes from start into net worked
+  const pct = Math.min((480 / totalSpan) * 100, 100); // 8h/10h = 80%
+  const marker = document.getElementById('markerContratual');
+  const label  = document.getElementById('markerContratualLabel');
+  marker.style.left = pct + '%';
+  label.textContent = fmtHM(contratualMin % 1440);
+}
+
+// ── 2. Saída planejada ──────────────────────
+function onSaidaPlanejadaChange() {
+  const val = document.getElementById('inpSaidaPlanejada').value;
+  const err = document.getElementById('saidaPlanejadaErr');
+  const info = document.getElementById('saidaPlanejadaInfo');
+  const btn  = document.getElementById('btnCriarAlarme');
+  const markerP = document.getElementById('markerPlanejado');
+
+  if (!val) {
+    err.style.display = 'none';
+    info.style.display = 'none';
+    btn.style.display  = 'none';
+    markerP.style.display = 'none';
+    state.saidaPlanejadaMin = 0;
+    persistState();
+    return;
+  }
+
+  const saidaMin = toMin(val);
+  const limiteMax = state.entradaMin + state.intervaloMin + 600;
+
+  if (saidaMin > limiteMax % 1440 || (saidaMin < state.entradaMin && saidaMin + 1440 > limiteMax)) {
+    err.style.display = 'block';
+    err.textContent   = `⛔ Horário inválido! Máximo permitido: ${fmtHM(limiteMax % 1440)} (entrada + 10h). Infração trabalhista.`;
+    info.style.display = 'none';
+    btn.style.display  = 'none';
+    markerP.style.display = 'none';
+    state.saidaPlanejadaMin = 0;
+    persistState();
+    return;
+  }
+
+  err.style.display  = 'none';
+  info.style.display = 'flex';
+  btn.style.display  = 'inline-flex';
+
+  // Position marker on bar
+  const netSaidaMin = saidaMin - state.entradaMin - state.intervaloMin;
+  const pct = Math.min((netSaidaMin / 600) * 100, 100);
+  markerP.style.display = 'block';
+  markerP.style.left    = pct + '%';
+
+  state.saidaPlanejadaMin = saidaMin;
+  persistState();
+}
+
+// Called from tick to update planned exit countdown
+function updateSaidaPlanejadaCountdown(netWorked) {
+  if (!state.saidaPlanejadaMin) return;
+  const saidaMin  = state.saidaPlanejadaMin;
+  const currentM  = nowMin();
+  let restMin = saidaMin - currentM;
+  if (restMin < 0) restMin += 1440;
+  const el = document.getElementById('saidaPlanejadaCountdown');
+  if (el) el.textContent = restMin > 0 ? fmtDur(restMin) : '⏰ Hora de sair!';
+}
+
+// ── 3. Obs obrigatória acima de 8h ──────────
+function updateObsRequired(netWorkedMin) {
+  const req = document.getElementById('obsRequired');
+  const opt = document.getElementById('obsOptional');
+  if (!req || !opt) return;
+  if (netWorkedMin > 480) {
+    req.style.display = 'inline';
+    opt.style.display = 'none';
+    document.getElementById('inpObs').placeholder = 'Obrigatório: descreva o motivo da hora extra...';
+  } else {
+    req.style.display = 'none';
+    opt.style.display = 'inline';
+    document.getElementById('inpObs').placeholder = 'Motivo da hora extra, reunião, entrega urgente...';
+  }
+}
+
+// ── 4. Padrão semanal de extras ─────────────
+function checkWeeklyPattern() {
+  const hist = loadHist();
+  if (hist.length < 3) return;
+
+  // Get last 5 work days (excluding today)
+  const todayStr = todayISO();
+  const workDays = hist
+    .filter(r => r.date !== todayStr && r.tipo === 'trabalho' && (r.netMin||0) > 480)
+    .slice(0, 5);
+
+  if (workDays.length < 3) return;
+
+  // Check if 3+ consecutive days with extra
+  let consecutive = 0;
+  const sorted = [...hist]
+    .filter(r => r.tipo === 'trabalho')
+    .sort((a,b) => b.date.localeCompare(a.date));
+
+  for (const r of sorted) {
+    if (r.date === todayStr) continue;
+    if ((r.netMin||0) > 480) consecutive++;
+    else break;
+  }
+
+  const alert = document.getElementById('weekPatternAlert');
+  const title = document.getElementById('weekPatternTitle');
+  const desc  = document.getElementById('weekPatternDesc');
+
+  if (consecutive >= 3) {
+    alert.style.display = 'flex';
+    title.textContent = `⚠️ Padrão de hora extra — ${consecutive} dias seguidos!`;
+    desc.textContent  = `Você registrou horas extras por ${consecutive} dias consecutivos. Considere conversar com seu gestor sobre redistribuição de demanda.`;
+  } else {
+    alert.style.display = 'none';
+  }
+}
+
+// ── Windows alarm via .bat ───────────────────
+// ── Browser alarm state ──────────────────────
+let browserAlarmTimeout  = null;
+let browserAlarmAudioCtx = null;
+let browserAlarmNodes    = [];
+let browserAlarmActive   = false;
+
+function criarAlarmeWindows() {
+  const val = document.getElementById('inpSaidaPlanejada').value;
+  if (!val) return;
+
+  // Cancel any existing alarm
+  cancelarAlarmeBrowser();
+
+  const alarmMin = toMin(val);
+  const nowM     = nowMin();
+  let   diffMs   = (alarmMin - nowM) * 60 * 1000;
+  if (diffMs <= 0) diffMs += 24 * 60 * 60 * 1000; // next day if past
+
+  // Schedule alarm
+  browserAlarmTimeout = setTimeout(() => dispararAlarmeBrowser(val), diffMs);
+  state.browserAlarmTime = val;
+  persistState();
+
+  // Visual confirmation on button
+  const btn = document.getElementById('btnCriarAlarme');
+  btn.textContent = `🔔 Alarme definido — ${val}`;
+  btn.style.background = 'var(--ok)';
+  btn.style.color = '#000';
+  btn.onclick = cancelarAlarmeBrowser;
+
+  // OS notification confirming setup (needs http:// — works via launcher)
+  sendOsNotif(`Alarme definido para ${val}`, 'O browser tocará um alarme no horário. Mantenha a aba aberta.', 'warn');
+}
+
+function dispararAlarmeBrowser(val) {
+  browserAlarmActive = true;
+
+  // 1. OS notification (persistent — requireInteraction: true)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification('⏰ Monitor de Jornada — Hora de sair!', {
+      body: `Saída planejada: ${val}\nBata seu ponto agora!`,
+      requireInteraction: true,
+      tag: 'jornada-alarm',
+    });
+    n.onclick = () => { pararAlarmeBrowser(); n.close(); window.focus(); };
+  }
+
+  // 2. Tab title urgent flash
+  startTitleFlash(`⏰ ALARME — ${val} — Bata o ponto!`);
+
+  // 3. Popup bloqueante no app com som em loop
+  const overlay = document.getElementById('popupOverlay');
+  const box     = document.getElementById('popupBox');
+  document.getElementById('popIco').textContent   = '⏰';
+  document.getElementById('popTitle').textContent = `Hora de sair! — ${val}`;
+  document.getElementById('popTitle').className   = 'popup-title danger';
+  document.getElementById('popText').textContent  =
+    'Seu horário planejado de saída chegou. Registre seu ponto agora.\nO alarme toca até você confirmar.';
+  document.getElementById('popCountdown').style.display = 'none';
+  box.className = 'popup-box danger';
+
+  // Swap buttons: only "Confirmar saída" stops alarm
+  document.getElementById('popSave').style.display    = 'inline-flex';
+  document.getElementById('popSave').textContent      = '✅ Confirmar saída e parar alarme';
+  document.getElementById('popDismiss').style.display = 'none';
+  overlay.style.pointerEvents = 'all';
+  overlay.classList.add('show');
+
+  // 4. Start continuous Web Audio alarm loop
+  iniciarLoopAudio();
+}
+
+function iniciarLoopAudio() {
+  if (!browserAlarmActive) return;
+  try {
+    browserAlarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    tocarCicloAlarme();
+  } catch(e) {}
+}
+
+function tocarCicloAlarme() {
+  if (!browserAlarmActive || !browserAlarmAudioCtx) return;
+  const ctx = browserAlarmAudioCtx;
+
+  // Pattern: two rising tones × 3, then 0.6s silence — like a phone alarm
+  const pattern = [
+    [880,  0.00, 0.18],
+    [1100, 0.22, 0.18],
+    [880,  0.44, 0.18],
+    [1100, 0.66, 0.18],
+    [880,  0.88, 0.18],
+    [1100, 1.10, 0.18],
+  ];
+  const cycleDuration = 1900; // ms
+
+  pattern.forEach(([freq, startSec, dur]) => {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const t = ctx.currentTime + startSec;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    gain.gain.setValueAtTime(0.22, t + dur - 0.03);
+    gain.gain.linearRampToValueAtTime(0, t + dur);
+    osc.start(t);
+    osc.stop(t + dur);
+    browserAlarmNodes.push(osc);
+  });
+
+  // Schedule next cycle
+  browserAlarmTimeout = setTimeout(() => {
+    browserAlarmNodes = [];
+    tocarCicloAlarme();
+  }, cycleDuration);
+}
+
+function pararAlarmeBrowser() {
+  browserAlarmActive = false;
+  if (browserAlarmTimeout)  { clearTimeout(browserAlarmTimeout);  browserAlarmTimeout  = null; }
+  if (browserAlarmAudioCtx) {
+    browserAlarmNodes.forEach(n => { try { n.stop(); } catch(e){} });
+    browserAlarmNodes = [];
+    try { browserAlarmAudioCtx.close(); } catch(e) {}
+    browserAlarmAudioCtx = null;
+  }
+  stopTitleFlash();
+  state.browserAlarmTime = null;
+  state.saidaPlanejadaMin = 0;
+  persistState();
+
+  // Reset button
+  const btn = document.getElementById('btnCriarAlarme');
+  if (btn) {
+    btn.textContent = '🔔 Criar alarme no Windows';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.onclick = criarAlarmeWindows;
+  }
+}
+
+function cancelarAlarmeBrowser() {
+  pararAlarmeBrowser();
+  document.getElementById('inpSaidaPlanejada').value = '';
+  document.getElementById('saidaPlanejadaInfo').style.display = 'none';
+  document.getElementById('btnCriarAlarme').style.display     = 'none';
+  document.getElementById('markerPlanejado').style.display    = 'none';
+  document.getElementById('saidaPlanejadaErr').style.display  = 'none';
+}
+
+// Hook confirmarSaidaDoPopup to also stop browser alarm
+const _origConfirmarSaida = confirmarSaidaDoPopup;
+confirmarSaidaDoPopup = function() {
+  pararAlarmeBrowser();
+  _origConfirmarSaida();
+};
+
+let importedRows   = [];   // parsed rows from PDF
+let conflictQueue  = [];   // rows that have conflicts
+let conflictIdx    = 0;
+let conflictResolve = null; // promise resolver
+
+// ── Drop / file handlers ────────────────────
+function handlePdfDrop(e) {
+  e.preventDefault();
+  document.getElementById('importDrop').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handlePdfFile(file);
+  else alert('Por favor, selecione um arquivo PDF.');
+}
+
+async function handlePdfFile(file) {
+  if (!file) return;
+  resetImport();
+  document.getElementById('importProgress').classList.add('show');
+  logImport('info', `📄 Lendo: ${file.name}`);
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    logImport('info', `📑 ${pdf.numPages} página(s) encontrada(s)`);
+
+    let fullText = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      // Join items preserving line structure via y-position grouping
+      const lines = groupTextByLine(content.items);
+      fullText += lines.join('\n') + '\n';
+    }
+
+    logImport('info', '🔍 Analisando linhas do cartão de ponto...');
+    const { rows, meta } = parsePontoText(fullText);
+
+    if (rows.length === 0) {
+      logImport('danger', '❌ Nenhum registro de dia útil encontrado. Verifique se o PDF é um cartão de ponto válido.');
+      return;
+    }
+
+    logImport('ok', `✅ ${rows.length} linhas identificadas — ${meta.mes}/${meta.ano}`);
+
+    // Mark conflicts
+    const hist = loadHist();
+    rows.forEach(r => {
+      const existing = hist.find(h => h.date === r.date);
+      r.conflict = !!existing && existing.source !== 'pdf' && r.tipo === 'trabalho';
+      r.existingRec = existing || null;
+    });
+
+    const conflicts = rows.filter(r => r.conflict).length;
+    if (conflicts > 0) logImport('warn', `⚠️ ${conflicts} dia(s) com conflito — será perguntado antes de importar`);
+
+    importedRows = rows;
+    renderPreview(rows, meta);
+
+  } catch (err) {
+    logImport('danger', '❌ Erro ao ler o PDF: ' + err.message);
+    console.error(err);
+  }
+}
+
+// ── Group PDF text items into visual lines by Y position ──
+function groupTextByLine(items) {
+  const byY = {};
+  items.forEach(item => {
+    const y = Math.round(item.transform[5]);
+    if (!byY[y]) byY[y] = [];
+    byY[y].push(item.str);
+  });
+  return Object.keys(byY)
+    .sort((a, b) => Number(b) - Number(a)) // top to bottom
+    .map(y => byY[y].join(' ').replace(/\s+/g, ' ').trim())
+    .filter(l => l.length > 0);
+}
+
+// ── Main parser for Energisa ponto format ──────────────────
+function parsePontoText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  // Extract mes/ano from header
+  let mes = '', ano = '';
+  const headerMatch = text.match(/(\w+)\/(\d{4})/);
+  if (headerMatch) {
+    const MESES = { Janeiro:'01',Fevereiro:'02',Março:'03',Abril:'04',Maio:'05',Junho:'06',
+                    Julho:'07',Agosto:'08',Setembro:'09',Outubro:'10',Novembro:'11',Dezembro:'12' };
+    mes = MESES[headerMatch[1]] || '??';
+    ano = headerMatch[2];
+  }
+
+  const rows = [];
+  // Regex for day lines: DD/MM/YYYY DOW [content]
+  // e.g.: "01/04/2026 QUA 07:35 11:30 13:30 18:27"
+  // e.g.: "04/04/2026 SAB"
+  // e.g.: "05/05/2026 TER Férias"
+  // e.g.: "16/04/2026 QUI 08:53 11:30 13:30 17:50 179 - EXAMES MEDICOS..."
+  const dayRe = /^(\d{2}\/\d{2}\/\d{4})\s+(SEG|TER|QUA|QUI|SEX|SAB|S[AÁ]B|DOM)\s*(.*)/i;
+  const timeRe = /\d{2}:\d{2}/g;
+
+  lines.forEach(line => {
+    const m = line.match(dayRe);
+    if (!m) return;
+
+    const [, dataBR, dow, resto] = m;
+    const [d, mm, yyyy] = dataBR.split('/');
+    const dateISO = `${yyyy}-${mm}-${d}`;
+    const dowUp = dow.toUpperCase();
+
+    // ── Ignorar dias futuros (a partir de amanhã) ──
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dayDate = new Date(Number(yyyy), Number(mm)-1, Number(d));
+    if (dayDate > today) return;
+
+    // Is it a weekend / holiday with no data?
+    const isFolga = ['SAB','SÁB','DOM'].includes(dowUp);
+
+    // Extract all times
+    const times = (resto.match(timeRe) || []);
+
+    // Detect special categories
+    const restoLow = resto.toLowerCase();
+    const isFerias = /f[eé]rias/i.test(resto);
+    const isFalta  = times.length === 0 && !isFerias && !isFolga && /falta|ausent/i.test(resto);
+    const isAbono  = /\d{3}\s*-\s*/.test(resto) && times.length > 0; // code + times = abono+trabalho
+    const abonoDesc = isAbono ? resto.replace(timeRe,'').replace(/^\s*\|.*$/,'').trim() : '';
+
+    if (isFolga) {
+      rows.push({ date: dateISO, dow, tipo: 'folga', entrada:'—', saida:'—', almocoS:'—', almocoR:'—', netMin:0, extra:0, obs:'Folga/DSR', lunchDur:0, status:'folga', source:'pdf' });
+      return;
+    }
+    if (isFerias) {
+      rows.push({ date: dateISO, dow, tipo: 'ferias', entrada:'—', saida:'—', almocoS:'—', almocoR:'—', netMin:0, extra:0, obs:'Férias', lunchDur:0, status:'ferias', source:'pdf' });
+      return;
+    }
+    if (isFalta || (times.length === 0 && !isFolga)) {
+      rows.push({ date: dateISO, dow, tipo: 'falta', entrada:'—', saida:'—', almocoS:'—', almocoR:'—', netMin:0, extra:0, obs: restoLow.includes('falta') ? 'Falta' : (resto || 'Sem registro'), lunchDur:0, status:'falta', source:'pdf' });
+      return;
+    }
+
+    // Work day — extract times
+    // Format: Ent1 Sai1 [Ent2 Sai2] [Ent3 Sai3]...
+    const entrada  = times[0] || '—';
+    const sai1     = times[1] || '—';   // saída almoço
+    const ent2     = times[2] || '—';   // retorno almoço
+    const saida    = times[3] || times[1] || '—'; // saída final
+
+    // Calculate lunch and worked time
+    let lunchMin = 0;
+    if (sai1 !== '—' && ent2 !== '—' && times.length >= 4) {
+      lunchMin = toMin(ent2) - toMin(sai1);
+    }
+
+    let netMin = 0;
+    if (entrada !== '—' && saida !== '—') {
+      const totalMin = toMin(saida) - toMin(entrada);
+      netMin = Math.max(0, totalMin - lunchMin);
+    }
+
+    const extra = Math.max(0, netMin - 480);
+    let status = 'ok';
+    if (netMin > 570) status = 'danger';
+    else if (netMin > 480) status = 'warn';
+
+    rows.push({
+      date: dateISO, dow, tipo: 'trabalho',
+      entrada, saida,
+      almocoS: sai1,
+      almocoR: ent2,
+      netMin, extra, lunchDur: lunchMin, status,
+      obs: abonoDesc || '',
+      source: 'pdf',
+    });
+  });
+
+  return { rows, meta: { mes, ano } };
+}
+
+// ── Render preview table ─────────────────────
+function renderPreview(rows, meta) {
+  const tipoIcon = { trabalho:'📋', ferias:'🏖', falta:'❌', folga:'💤', abono:'📋' };
+  const statusColor = { ok:'var(--ok)', warn:'var(--warn)', danger:'var(--danger)', ferias:'var(--info)', falta:'var(--danger)', folga:'var(--muted)' };
+
+  document.getElementById('previewCount').textContent = rows.length;
+  document.getElementById('previewBody').innerHTML = rows.map((r, i) => {
+    const rowClass = r.tipo === 'ferias' ? 'ferias' : r.tipo === 'folga' ? 'folga' : r.tipo === 'falta' ? 'falta' : r.conflict ? 'conflict' : '';
+    const extraStr = r.extra > 0 ? `+${fmtDur(r.extra)}` : '—';
+    const almocoStr = (r.almocoS !== '—' && r.almocoR !== '—') ? `${r.almocoS}–${r.almocoR}` : '—';
+    const netStr = r.netMin > 0 ? fmtDur(r.netMin) : '—';
+    const conflictBadge = r.conflict ? ' <span style="color:var(--warn);font-size:0.65rem">⚠ conflito</span>' : '';
+    return `<div class="preview-row ${rowClass}">
+      <span style="font-family:'DM Mono',monospace;font-size:0.75rem">${fmtDate(r.date)}</span>
+      <span>${tipoIcon[r.tipo]||'📋'} ${r.tipo}${conflictBadge}</span>
+      <span style="font-family:'DM Mono',monospace">${r.entrada !== '—' ? r.entrada+' → '+r.saida : '—'}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:0.72rem">${almocoStr}</span>
+      <span style="font-family:'DM Mono',monospace">${netStr}</span>
+      <span style="color:${r.extra>0?'var(--warn)':'var(--muted)'};font-family:'DM Mono',monospace">${extraStr}</span>
+      <span style="font-size:0.72rem;color:var(--muted)">${r.obs||'—'}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('importPreviewWrap').style.display = 'block';
+}
+
+// ── Execute import with conflict resolution ──
+async function executeImport() {
+  const hist = loadHist();
+  let imported = 0, skipped = 0, kept = 0;
+
+  for (const row of importedRows) {
+    if (row.conflict) {
+      // Show conflict modal and wait for user decision
+      const decision = await showConflictModal(row);
+      if (decision === 'skip') { skipped++; continue; }
+      if (decision === 'keep') { kept++; continue; }
+      // 'pdf' → fall through to save
+    }
+
+    // Save/overwrite
+    const idx = hist.findIndex(h => h.date === row.date);
+    if (idx >= 0) hist[idx] = row; else hist.unshift(row);
+    imported++;
+  }
+
+  // Sort by date desc
+  hist.sort((a, b) => b.date.localeCompare(a.date));
+  saveHist(hist);
+
+  logImport('ok', `\n✅ Importação concluída!`);
+  logImport('ok', `   • ${imported} dias importados`);
+  if (kept > 0)    logImport('info', `   • ${kept} mantidos (registro manual preferido)`);
+  if (skipped > 0) logImport('warn', `   • ${skipped} pulados`);
+
+  // Se hoje foi importado e tem entrada, ativar o monitor automaticamente
+  const todayRow = importedRows.find(r => r.date === todayISO() && r.tipo === 'trabalho' && r.entrada !== '—');
+  if (todayRow) {
+    logImport('ok', `   • Hoje detectado — iniciando monitor automaticamente`);
+    setTimeout(() => {
+      ativarHojeFromPdf(todayRow);
+      nav('hoje');
+    }, 1000);
+  } else {
+    document.getElementById('importPreviewWrap').style.display = 'none';
+    setTimeout(() => { nav('historico'); }, 1200);
+  }
+}
+
+// ── Conflict modal (returns promise) ─────────
+function showConflictModal(row) {
+  return new Promise(resolve => {
+    conflictResolve = resolve;
+    const manual = row.existingRec;
+
+    document.getElementById('conflictSub').textContent =
+      `Dia ${fmtDate(row.date)} (${row.dow}) já tem registro manual.`;
+
+    document.getElementById('conflictManual').innerHTML =
+      `Entrada: ${manual.entrada || '—'}<br>` +
+      `Almoço: ${manual.almocoS||'—'} – ${manual.almocoR||'—'}<br>` +
+      `Saída: ${manual.saida || '—'}<br>` +
+      `Total: ${fmtDur(manual.netMin||0)}<br>` +
+      `Extra: ${manual.extra > 0 ? '+'+fmtDur(manual.extra) : '—'}`;
+
+    document.getElementById('conflictPdf').innerHTML =
+      `Entrada: ${row.entrada}<br>` +
+      `Almoço: ${row.almocoS} – ${row.almocoR}<br>` +
+      `Saída: ${row.saida}<br>` +
+      `Total: ${fmtDur(row.netMin)}<br>` +
+      `Extra: ${row.extra > 0 ? '+'+fmtDur(row.extra) : '—'}`;
+
+    document.getElementById('conflictOverlay').classList.add('show');
+  });
+}
+
+function resolveConflict(decision) {
+  document.getElementById('conflictOverlay').classList.remove('show');
+  if (conflictResolve) { conflictResolve(decision); conflictResolve = null; }
+}
+
+// ── Helpers ──────────────────────────────────
+function logImport(type, msg) {
+  const log = document.getElementById('importLog');
+  const span = document.createElement('span');
+  span.className = 'log-' + type;
+  span.textContent = msg;
+  log.appendChild(span);
+  log.appendChild(document.createElement('br'));
+  log.scrollTop = log.scrollHeight;
+  document.getElementById('importProgress').classList.add('show');
+}
+
+function resetImport() {
+  importedRows = [];
+  conflictQueue = [];
+  document.getElementById('importLog').innerHTML = '';
+  document.getElementById('importProgress').classList.remove('show');
+  document.getElementById('importPreviewWrap').style.display = 'none';
+  document.getElementById('pdfInput').value = '';
+}
+
+// ── Registrar Service Worker (PWA) ───────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('[PWA] Service Worker registrado:', reg.scope))
+      .catch(err => console.warn('[PWA] SW não registrado:', err));
+  });
+}
+
+</script>
+</body>
+</html>
